@@ -21,6 +21,8 @@ class ConnectionPool(object):
         self.created_connect = 0
         self._in_use_connections = set()
 
+
+
     async def get_connection(self):
         try:
             if self.created_connect >= self.max_connections:
@@ -41,6 +43,10 @@ class ConnectionPool(object):
     def release(self, connection):
         self._in_use_connections.remove(connection)
         self._available_connections.append(connection)
+
+    def remove_connection(self, connection):
+        self.created_connect -= 1
+        self._in_use_connections.remove(connection)
 
     def disconnect(self):
         "Disconnects all connections in the pool"

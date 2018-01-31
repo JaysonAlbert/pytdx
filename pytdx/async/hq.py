@@ -49,8 +49,13 @@ def exec_command(func):
                                       u'd0 c9 cc d6 a4 a8 af 00 00 00 8f c2 25'
                                       u'40 13 00 00 d5 00 c9 cc bd f0 d7 ea 00'
                                       u'00 00 02'), connection)
-
-        data = await func(self, *args, **kwargs, connection=connection)
+        try:
+            data = await func(self, *args, **kwargs, connection=connection)
+        except Exception as e:
+            self.pool.remove_connection(connection)
+            print('connection remove')
+            if self.raise_exception:
+                raise e
         return data
 
     return wrapper
@@ -220,6 +225,12 @@ class ATdxHq_API():
                    .set_index('date', drop=False, inplace=False) \
                    .drop(['year', 'month', 'day', 'hour', 'minute', 'datetime'], axis=1)[start_date:end_date]
         return data.assign(date=data['date'].apply(lambda x: str(x)[0:10]))
+
+    def connect(self):
+        return self
+
+    def disconnect(self):
+        return self
 
 
 if __name__ == '__main__':
