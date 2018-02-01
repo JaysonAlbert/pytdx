@@ -40,23 +40,33 @@ async def receive_all(send_pkg, connection):
 def exec_command(func):
     @wraps(func)
     async def wrapper(self, *args, **kwargs):
-        connection = await self.pool.get_connection()
 
-        if not connection.connected:
-            await receive_all(bytearray.fromhex(u'0c 02 18 93 00 01 03 00 03 00 0d 00 01'), connection)
-            await receive_all(bytearray.fromhex(u'0c 02 18 94 00 01 03 00 03 00 0d 00 02'), connection)
-            await receive_all(bytearray.fromhex(u'0c 03 18 99 00 01 20 00 20 00 db 0f d5'
-                                      u'd0 c9 cc d6 a4 a8 af 00 00 00 8f c2 25'
-                                      u'40 13 00 00 d5 00 c9 cc bd f0 d7 ea 00'
-                                      u'00 00 02'), connection)
-        try:
-            data = await func(self, *args, **kwargs, connection=connection)
-        except Exception as e:
-            self.pool.remove_connection(connection)
-            print('connection remove')
-            if self.raise_exception:
-                raise e
-        return data
+        async def get_connection():
+            connection = await self.pool.get_connection()
+
+            if not connection.connected:
+                await receive_all(bytearray.fromhex(u'0c 02 18 93 00 01 03 00 03 00 0d 00 01'), connection)
+                await receive_all(bytearray.fromhex(u'0c 02 18 94 00 01 03 00 03 00 0d 00 02'), connection)
+                await receive_all(bytearray.fromhex(u'0c 03 18 99 00 01 20 00 20 00 db 0f d5'
+                                          u'd0 c9 cc d6 a4 a8 af 00 00 00 8f c2 25'
+                                          u'40 13 00 00 d5 00 c9 cc bd f0 d7 ea 00'
+                                          u'00 00 02'), connection)
+
+            return connection
+
+        count = 0
+        while count < 3:
+            connection = await get_connection()
+            try:
+                data = await func(self, *args, **kwargs, connection=connection)
+                return data
+            except Exception as e:
+                self.pool.remove_connection(connection)
+                count = count + 1
+                print('connection remove: {}'.format(count))
+
+        raise Exception("failed after retry for 3 times")
+
 
     return wrapper
 
